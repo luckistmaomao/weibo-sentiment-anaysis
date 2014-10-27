@@ -8,20 +8,32 @@ from pymongo import MongoClient
 from collections import defaultdict
 import datetime
 import jieba
+import time
+import os
 
+curpath=os.path.normpath( os.path.join( os.getcwd(), os.path.dirname(__file__) ) ) 
 DATA_SOURCE = ['np','nw','weibo']
-client = MongoClient('114.212.191.119')
+client = MongoClient('121.40.193.156')
 user_sentiment_collection = 'user_sentiment'
 sentiment_tags = ['negative','neutral','positive']
+
+class Timer(object):                                                                                                                                   
+    def __enter__(self):
+        self.start = time.clock()
+        return self
+
+    def __exit__(self, *args):
+        self.end = time.clock()
+        self.interval = self.end - self.start
 
 def load_dict():
     neg_dict = set()
     pos_dict = set()
-    with open('neg.dict') as f:
+    with open(curpath+'/neg.dict') as f:
         for line in f:
             neg_word = line.strip().decode('utf-8')
             neg_dict.add(neg_word)
-    with open('pos.dict') as f:
+    with open(curpath+'/pos.dict') as f:
         for line in f:
             pos_word = line.strip().decode('utf-8')
             pos_dict.add(pos_word)
@@ -54,6 +66,7 @@ def init_sentiment_distribution(user_dbname):
     userdb = client[user_dbname] 
     time_dict = dict()
     for source in DATA_SOURCE:
+	print source
         collection_name = 'user_%s' % (source,)
         source_collection = userdb[collection_name]
         if source in ['bbs','weibo']:
@@ -100,17 +113,25 @@ def update_sentiment_distribution(user_dbname,target_time):
     sentiment_dict['time'] = str(target_time)
     if userdb['user_sentiment'].find({'time':target_time}).count() == 0:
         userdb['user_sentiment'].insert(sentiment_dict)
+    #    print user_dbname,target_time,sentiment_dict
 
 def calculate_sentiment_distribution():
     user_list = get_user_list_from_dB()
+    print user_list
     for user_name in user_list:
         user_dbname = 'user_%s_database' % (user_name,)
         user_collections = client[user_dbname].collection_names()
-        if user_sentiment_collection in user_collections:
-            target_time = datetime.date.today() #- datetime.timedelta(days=1)
-            update_sentiment_distribution(user_dbname,str(target_time))
-        else:
-            init_sentiment_distribution(user_dbname)
+#        if user_sentiment_collection in user_collections:
+#            target_time = datetime.date.today() - datetime.timedelta(days=1)
+#            update_sentiment_distribution(user_dbname,str(target_time))
+#        else:
+#            init_sentiment_distribution(user_dbname)
+        target_time = datetime.date.today() - datetime.timedelta(days=1)
+        update_sentiment_distribution(user_dbname,str(target_time))
         
 if __name__ == "__main__":
-    calculate_sentiment_distribution()
+    print 'start',time.ctime()
+    with Timer() as t:
+        calculate_sentiment_distribution()
+    #print t.interval
+    print 'end',time.ctime()
